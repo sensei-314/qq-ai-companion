@@ -95,6 +95,16 @@ python main.py
 
 生产环境建议用 systemd 托管（`Restart=always`），再配一个看门狗。
 
+## 运维脚本
+
+| 脚本 | 作用 |
+| --- | --- |
+| `deploy.py` | 通过 SSH 上传并重启（`python deploy.py`、`--logs`、`--restart`） |
+| `health.py` | 极简状态页：服务、容器、内存、磁盘、最近日志 |
+| `fetch_backup.py` | 从服务器拉取最新的 `molly-*.tar.gz` |
+| `migrate_memory.py` | 从旧版目录结构导入记忆 |
+
+**SSH 主机、密码、token、路径全部从环境变量读**——这些脚本里不含任何主机、口令或 API key。
 ## 免责声明（必读）
 
 1. 本仓库**只提供软件**：你需要自行部署 SnowLuma、自备 QQ 账号与 API key；

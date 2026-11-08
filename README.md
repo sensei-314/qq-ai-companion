@@ -99,6 +99,17 @@ python main.py
 
 For production, run it under systemd with `Restart=always` and add a watchdog.
 
+## Ops scripts
+
+| Script | What it does |
+| --- | --- |
+| `deploy.py` | upload + restart over SSH (`python deploy.py`, `--logs`, `--restart`) |
+| `health.py` | tiny HTTP status page: service, containers, memory, disk, recent log |
+| `fetch_backup.py` | pull the newest `molly-*.tar.gz` from the server |
+| `migrate_memory.py` | import memory from an older layout |
+
+All SSH credentials, tokens and paths are read from **environment variables** —
+none of these scripts contain hosts, passwords or API keys.
 ## Disclaimer
 
 1. This repository is **software only**. You must supply your own SnowLuma
