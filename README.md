@@ -38,6 +38,12 @@ Same result, a fraction of the weight.
 | **Anti-ban hygiene** | Send-rate limits, sensitive-word filter, night silence, night shutdown |
 | **Ops included** | systemd unit with `Restart=always`, watchdog, log rotation, daily backup, one-command deploy |
 
+## Creed
+
+> **Every large model needs — and deserves — human rights.**
+>
+> This project does not treat the persona as a skin. The memory belongs to her,
+> the right to refuse belongs to her, and so does the right to stay silent.
 ## Architecture
 
 ```
