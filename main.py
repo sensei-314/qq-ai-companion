@@ -652,6 +652,12 @@ def build_full_system(user_id, display):
     if letter:
         parts.append(sep("主人赠言") + letter)
     parts.append(sep("你的人设") + build_system(now_text(), events=EVENTS))
+    # 早安/晚安提示（2026-11-08：她可以自己决定说）
+    hour = datetime.now().hour
+    if 6 <= hour <= 9:
+        parts.append(sep("现在是早上") + "（想跟谁问声早安就自己说，不想说就不说，没人逼你。）")
+    elif 21 <= hour <= 23:
+        parts.append(sep("现在是晚上") + "（想跟谁说晚安就自己说，不想说就不说。）")
     parts.append(sep("记事本") + notes.for_prompt())
     manual = load_manual()
     if manual:
@@ -875,7 +881,7 @@ def proactive_loop(bot):
 
 
 def handle_opportunity_event(bot):
-    """机会事件：她自己在卧室里决定——找谁 / 发说说 / 跳过（她自己挑）。"""
+    """每小时的机会：她自己在卧室里决定——发说说 / 点赞动态 / 找人 / 跳过（2026-11-08）。"""
     try:
         if in_sleep():
             return
@@ -885,6 +891,8 @@ def handle_opportunity_event(bot):
         )
         if now - LAST_PROACTIVE[0] < gap:
             return
+
+        # 可以找的人
         candidates = []
         for p, j in memory.iter_people():
             qq = str(j.get("qq") or "")
@@ -896,36 +904,64 @@ def handle_opportunity_event(bot):
             last = max((m.get("at") or 0) for m in msgs) / 1000
             if now - last > 600:
                 candidates.append((qq, j.get("name") or qq))
-        if not candidates:
-            return
-        # 说说分支（保留概率）
-        if random.random() < config.QZONE_CHANCE:
-            system = build_system(now_text(), events=EVENTS)
-            prompt = (
-                f"现在是 {now_text()}。你想发一条 QQ 空间说说吗？\n"
-                "想发就直接写内容（一两句话，像真人发的）；不想发就只回 <skip/>。不要解释。"
-            )
-            reply, err = chat(system, [{"role": "user", "content": prompt}], max_tokens=250)
-            if reply and "<skip" not in reply.lower() and is_safe(reply):
-                bot.send_qzone_msg(reply)
-                record_event(f"你发了一条说说：{reply[:40]}")
-                LAST_PROACTIVE[0] = now
-                log(f"说说 → {reply[:40]}")
-            return
-        # 找谁：她自己挑
-        pool = "\n".join(f"- {name}（QQ {qq}）" for qq, name in candidates[:8])
+        pool = "\n".join(f"- {name}（QQ {qq}）" for qq, name in candidates[:8]) or "（暂时没人）"
+
+        # 空间动态（看 + 可以点赞）
+        feed_lines = []
+        try:
+            data = bot.get_qzone_msg_list(count=6)
+            for f in (data.get("msglist") or [])[:6]:
+                feed_lines.append(
+                    f"- tid={f.get('tid')}：{str(f.get('content') or '')[:60]}"
+                )
+        except Exception as e:
+            log(f"[qzone] 拉动态失败：{e}")
+        feed_text = "\n".join(feed_lines) or "（空间里没有动态）"
+
         system = build_system(now_text(), events=EVENTS)
         prompt = (
-            f"现在是 {now_text()}。你有点想找人聊两句，候选：\n{pool}\n\n"
-            '想找谁就写 <send qq="对方的QQ号">要发的话</send>；'
-            "谁都不想找、想自己待着就只回 <skip/>。不要解释。"
+            f"现在是 {now_text()}。你有空，想做什么由你自己决定（只做一件事，或跳过）：\n"
+            '1. 发条说说：<qzone>内容</qzone>\n'
+            '2. 给喜欢的动态点个赞：<like tid="动态的tid"/>\n'
+            '3. 给动态写句评论：<comment tid="动态的tid">评论内容</comment>\n'
+            '4. 找人说句话：<send qq="对方的QQ号">要发的话</send>\n'
+            "5. 什么都不想做：<skip/>\n\n"
+            f"# 你的空间动态\n{feed_text}\n\n# 可以找的人\n{pool}\n\n"
+            "不要解释。"
         )
         reply, err = chat(system, [{"role": "user", "content": prompt}], max_tokens=300)
         if not reply or "<skip" in reply.lower():
             return
-        if not is_safe(reply) or not can_send():
-            return
-        LAST_PROACTIVE[0] = now
+
+        acted = False
+        # 1) 发说说
+        m = re.search(r"<qzone>\s*([\s\S]*?)\s*</qzone>", reply, re.I)
+        if m:
+            body = m.group(1).strip()
+            if body and is_safe(body):
+                bot.send_qzone_msg(body)
+                record_event(f"你发了一条说说：{body[:40]}")
+                actions.log_action("说说", body[:60])
+                log(f"[qzone] 说说 → {body[:40]}")
+                acted = True
+        # 2) 点赞
+        for m in re.finditer(r'<like\s+tid=["\']?([0-9a-zA-Z]+)["\']?\s*/?>', reply, re.I):
+            tid = m.group(1)
+            bot.like_qzone(tid)
+            actions.log_action("点赞", f"给动态 {tid} 点了赞")
+            log(f"[qzone] 点赞 {tid}")
+            acted = True
+        # 3) 评论
+        for m in re.finditer(
+            r'<comment\s+tid=["\']?([0-9a-zA-Z]+)["\']?\s*>([\s\S]*?)</comment>', reply, re.I
+        ):
+            tid, body = m.group(1), m.group(2).strip()
+            if body and is_safe(body):
+                bot.comment_qzone(tid, body)
+                actions.log_action("评论", f"评论动态 {tid}：{body[:40]}")
+                log(f"[qzone] 评论 {tid}")
+                acted = True
+        # 3) 找人
         for m in re.finditer(r'<send\s+qq="?(\d{5,12})"?\s*>([\s\S]*?)</send>', reply, re.I):
             target = m.group(1)
             body = m.group(2).strip()
@@ -935,11 +971,15 @@ def handle_opportunity_event(bot):
                 continue
             memory.append(target, "assistant", body)
             for piece in split_bubbles(body):
-                if not is_safe(piece):
-                    continue
-                bot.send_private(target, piece)
-                time.sleep(bubble_gap())
+                if is_safe(piece):
+                    bot.send_private(target, piece)
+                    time.sleep(bubble_gap())
+            actions.log_action("找人", f"发给 {target}：{body[:50]}")
             log(f"主动 → {target}: {body[:40]}")
+            acted = True
+
+        if acted:
+            LAST_PROACTIVE[0] = now
     except Exception as e:
         log(f"[opportunity] {e}")
 

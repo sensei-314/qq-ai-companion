@@ -101,6 +101,14 @@ class OneBot:
         r = self.call("get_qzone_msg_list", {"count": count})
         return (r or {}).get("data") or {}
 
+    def like_qzone(self, tid):
+        """给一条动态点赞（2026-11-08，SnowLuma 的 like_qzone 需要 tid）。"""
+        return self.call("like_qzone", {"tid": str(tid)})
+
+    def comment_qzone(self, tid, content):
+        """给动态写评论（2026-11-08 实测 comment_qzone 可用）。"""
+        return self.call("comment_qzone", {"tid": str(tid), "content": str(content)})
+
     # ---------- WS ----------
     def listen(self, on_event):
         url = ONEBOT_WS + (ONEBOT_TOKEN or "")
