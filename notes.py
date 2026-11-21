@@ -35,6 +35,18 @@ def save(data):
         print(f"[notes] save fail: {e}")
 
 
+def _similar(a, b):
+    """粗略判断两条笔记是否同义（2026-11-17 去重）。"""
+    import re as _re
+
+    ka = set(_re.findall(r"[\u4e00-\u9fa5A-Za-z0-9]{2,}", str(a)))
+    kb = set(_re.findall(r"[\u4e00-\u9fa5A-Za-z0-9]{2,}", str(b)))
+    if not ka or not kb:
+        return False
+    inter = len(ka & kb)
+    return inter / max(1, min(len(ka), len(kb))) >= 0.55
+
+
 def add(text, cat=""):
     t = str(text or "").strip()
     if not t:
@@ -66,13 +78,15 @@ def search(keyword, limit=10):
 
 
 def for_prompt():
-    """给 system prompt 的记事本内容：全文，不截取（2026-11-08 主人要求）。"""
+    """给 system prompt 的记事本内容（2026-11-18 主人：最新在前，旧的放后面并标明是她自己写的）。"""
     items = load().get("notes", [])
     if not items:
         return "（记事本还是空的）"
+    items = items[-40:][::-1]  # 倒序：最新的在最前
     lines = []
-    for n in items:
-        t = time.strftime("%m-%d %H:%M", time.localtime((n.get("at") or 0) / 1000))
+    for idx, n in enumerate(items):
+        t = time.strftime("%Y-%m-%d %H:%M", time.localtime((n.get("at") or 0) / 1000))
         cat = f"【{n['cat']}】" if n.get("cat") else ""
         lines.append(f"- [{t}] {cat}{n.get('text') or ''}")
-    return "\n".join(lines)
+    head = "（这些是你自己以前写的，是你独特的记忆——最新的在最上面）"
+    return head + "\n" + "\n".join(lines)

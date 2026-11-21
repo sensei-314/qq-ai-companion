@@ -189,3 +189,16 @@ data/
 backup/
 *.log
 *.jsonl
+
+# ===== 运行时数据（2026-11-21 新增）=====
+digests.json
+sleep_plan.json
+qzone_times.json
+comment_times.json
+proactive.json
+group_sent.json
+system_events.jsonl
+actions.jsonl
+chat_only.jsonl
+short_notes.jsonl
+mom_chat.jsonl

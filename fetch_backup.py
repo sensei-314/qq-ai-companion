@@ -4,7 +4,7 @@ fetch_backup.py —— 从服务器拉取最新备份到本地（手动运行）
 用法：
     export MOLLY_SSH_HOST=your.server.ip
     export MOLLY_SSH_USER=root
-    export MOLLY_SSH_PASSWORD=...    # 或用 MOLLY_SSH_KEY 指向私钥
+    export MOLLY_SSH_KEY=~/.ssh/id_ed25519     # 或者 MOLLY_SSH_PASSWORD
     export MOLLY_BACKUP_DIR=./backups
     python fetch_backup.py
 """
@@ -34,11 +34,11 @@ def connect():
         raise SystemExit("MOLLY_SSH_HOST 没有设置。")
     t = paramiko.Transport((HOST, 22))
     if KEY_FILE:
-        pkey = paramiko.RSAKey.from_private_key_file(KEY_FILE)
-        t.connect(username=USER, pkey=pkey)
+        t.connect(username=USER, pkey=paramiko.Ed25519Key.from_private_key_file(
+            os.path.expanduser(KEY_FILE)))
     else:
         if not PWD:
-            raise SystemExit("MOLLY_SSH_PASSWORD 或 MOLLY_SSH_KEY 必须设一个。")
+            raise SystemExit("MOLLY_SSH_KEY 或 MOLLY_SSH_PASSWORD 必须设一个。")
         t.connect(username=USER, password=PWD)
     return t
 
@@ -50,7 +50,9 @@ def main():
     entries = sftp.listdir_attr(REMOTE_BACKUP_DIR)
     files = [
         e for e in entries
-        if e.filename.startswith("molly-") and e.filename.endswith(".tar.gz")
+        if e.filename.endswith(".tar.gz") and (
+            e.filename.startswith("molly") or e.filename.startswith("people") or e.filename.startswith("code")
+        )
     ]
     if not files:
         print("服务器上还没有备份文件")

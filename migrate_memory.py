@@ -1,7 +1,7 @@
 """
 migrate_memory.py —— 把 DSH 版 people 记忆迁到 Python 版
 
-来源：$MOLLY_LEGACY_PEOPLE（旧版 people 目录）
+来源：D:\\Molly\\data\\people\\*.json
 目标：本目录 people/*.json + _global.json（全局时间线）
 
 保留字段：role / text / at / images；多余的 who/userId/scene 丢弃。

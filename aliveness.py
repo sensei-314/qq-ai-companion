@@ -78,7 +78,35 @@ def _in_range(hm, start, end):
     return hm >= start or hm < end
 
 
+def _load_sleep_plan():
+    """读她自己定的睡眠计划（24 小时内有效，2026-11-21）。"""
+    import json as _json
+    import os as _os
+    import time as _time
+
+    path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "sleep_plan.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = _json.load(f)
+    except Exception:
+        return None
+    at = d.get("at") or 0
+    if not at or _time.time() * 1000 - at > 24 * 3600 * 1000:
+        return None
+    return d
+
+
 def in_sleep():
+    """优先用她自己定的时间（sleep_plan.json），没有才回退到默认。"""
+    plan = _load_sleep_plan()
+    if plan is not None:
+        if not plan.get("sleep"):
+            # 熬穿：今晚不睡
+            return False
+        sleep_at = str(plan.get("sleep_at") or "").strip()
+        wake_at = str(plan.get("wake_at") or "").strip()
+        if sleep_at and wake_at:
+            return _in_range(_now_hm(), sleep_at, wake_at)
     return _in_range(_now_hm(), SLEEP_START, SLEEP_END)
 
 

@@ -23,10 +23,12 @@ class OneBot:
     # ---------- HTTP ----------
     def call(self, action, params=None, timeout=15):
         try:
+            # 2026-11-14：NapCat 用标准 OneBot（POST /<action>），不再是 SnowLuma 的根路径格式
+            url = f"{ONEBOT_HTTP.rstrip('/')}/{action}"
             r = requests.post(
-                ONEBOT_HTTP,
+                url,
                 headers={"Authorization": f"Bearer {ONEBOT_HTTP_TOKEN}"},
-                json={"action": action, "params": params or {}},
+                json=params or {},
                 timeout=timeout,
             )
             return r.json()
@@ -95,19 +97,71 @@ class OneBot:
 
     # ---------- QQ 空间 ----------
     def send_qzone_msg(self, text):
-        return self.call("send_qzone_msg", {"message": text})
+        # 2026-11-14：API 参数是 content（之前用 message 一直失败）
+        return self.call("send_qzone_msg", {"content": text})
 
     def get_qzone_msg_list(self, count=5):
-        r = self.call("get_qzone_msg_list", {"count": count})
+        # NapCat 的参数是 pos/num，不是 count（2026-11-16 修）
+        r = self.call("get_qzone_msg_list", {"pos": 0, "num": count})
         return (r or {}).get("data") or {}
 
-    def like_qzone(self, tid):
-        """给一条动态点赞（2026-11-08，SnowLuma 的 like_qzone 需要 tid）。"""
-        return self.call("like_qzone", {"tid": str(tid)})
+    def like_qzone(self, tid, target_uin="", abstime=0):
+        """给一条说说点赞（2026-11-21：必须带 target_uin + abstime 才生效）。"""
+        params = {"tid": str(tid)}
+        if target_uin:
+            params["target_uin"] = str(target_uin)
+        if abstime:
+            params["abstime"] = int(abstime)
+        return self.call("like_qzone", params)
 
-    def comment_qzone(self, tid, content):
-        """给动态写评论（2026-11-08 实测 comment_qzone 可用）。"""
-        return self.call("comment_qzone", {"tid": str(tid), "content": str(content)})
+    def unlike_qzone(self, tid, target_uin="", abstime=0):
+        """取消点赞（参数同 like_qzone）。"""
+        params = {"tid": str(tid)}
+        if target_uin:
+            params["target_uin"] = str(target_uin)
+        if abstime:
+            params["abstime"] = int(abstime)
+        return self.call("unlike_qzone", params)
+
+    def comment_qzone(self, tid, content, parent_comment_id=None):
+        """给动态写评论/回复评论（2026-11-14：回复要 parent_comment_id）。"""
+        params = {"tid": str(tid), "content": str(content)}
+        if parent_comment_id:
+            params["parent_comment_id"] = str(parent_comment_id)
+        return self.call("comment_qzone", params)
+
+    def qzone_detail(self, tid):
+        """一条动态的详情（含评论列表，2026-11-14）。"""
+        r = self.call("get_qzone_msg_detail", {"tid": str(tid)})
+        return (r or {}).get("data") or {}
+
+    def send_like(self, user_id, times=1):
+        """给好友名片/主页点赞（2026-11-14 实测可用）。"""
+        return self.call("send_like", {"user_id": int(user_id), "times": int(times)})
+
+    def get_qzone_feeds(self, count=8):
+        """好友动态列表（2026-11-14，含 uin/nickname/html/key）。
+
+        2026-11-21：加 complete 参数后部分 feed 会带 tid，可用 detail 读内容。
+        """
+        r = self.call("get_qzone_feeds", {"count": count, "complete": True})
+        return (r or {}).get("data") or {}
+
+    def set_friend_remark(self, user_id, remark):
+        """改 QQ 好友备注（2026-11-15，NapCat set_friend_remark）。"""
+        return self.call(
+            "set_friend_remark", {"user_id": int(user_id), "remark": str(remark or "")}
+        )
+
+    def get_guild_list(self):
+        """她加入的频道列表（2026-11-14，NapCat 频道接口）。"""
+        r = self.call("get_guild_list", {})
+        return (r or {}).get("data") or []
+
+    def get_guild_profile(self):
+        """她在频道里的个人信息。"""
+        r = self.call("get_guild_service_profile", {})
+        return (r or {}).get("data") or {}
 
     # ---------- WS ----------
     def listen(self, on_event):
