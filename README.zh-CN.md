@@ -134,6 +134,12 @@ python main.py
 4. 本仓库**刻意不含任何真实聊天记录、真实人设文件与 API key**。也请你不要把
    自己的这类数据提交上来。
 
+## 致谢
+
+- [`rezult`](https://github.com/mutableMappingSequence/rezult) —— 给 Python 带来
+  Rust 风格的 `Result` / `Option`，作者
+  [MutableMappingSequence](https://github.com/mutableMappingSequence)。
+  用在 `llm.chat_result()`（日摘要、呢喃、妈妈信道三处）。
 ## 许可证
 
 MIT

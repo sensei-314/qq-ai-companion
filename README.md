@@ -140,6 +140,12 @@ whole directory.
 4. This repository intentionally contains **no real chat logs, no real persona
    files, and no API keys**. Please keep it that way.
 
+## Credits
+
+- [`rezult`](https://github.com/mutableMappingSequence/rezult) — Rust-style
+  `Result` / `Option` for Python, by
+  [MutableMappingSequence](https://github.com/mutableMappingSequence).
+  Used in `llm.chat_result()` (three call sites: daily digest, murmur, mom channel).
 ## License
 
 MIT
